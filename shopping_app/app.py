@@ -13,7 +13,7 @@ UPLOAD_FOLDER = "uploads"
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
 # Azure Storage connection string from App Service Configuration
-connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
+connection_string = os.environ.get("STORAGE_CONNECTION_STRING")
 
 blob_service_client = BlobServiceClient.from_connection_string(connection_string)
 container_name = "productimages"
@@ -178,4 +178,5 @@ def history():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000)
+
 
