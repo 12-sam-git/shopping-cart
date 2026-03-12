@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+<title>Shopping Store</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+
+<h1 class="title">Shopping Store</h1>
+
+<div class="search-bar">
+
+<form action="/search">
+<input type="text" name="query" placeholder="Search product">
+<button type="submit">Search</button>
+</form>
+
+</div>
+
+<div class="upload-section">
+
+<form action="/upload" method="post" enctype="multipart/form-data">
+<input type="file" name="image">
+<button type="submit">Image Search</button>
+</form>
+
+</div>
+
+<a class="cart-link" href="/cart">View Cart</a>
+
+<h2>Products</h2>
+
+<div class="product-container">
+
+{% for p in products %}
+
+<div class="product-card">
+
+<h3>{{p.name}}</h3>
+
+<p>Price : ₹{{p.price}}</p>
+
+<a class="cart-btn" href="/add_to_cart/{{p.id}}">Add To Cart</a>
+
+</div>
+
+{% endfor %}
+
+</div>
+
+</body>
+
+</html>

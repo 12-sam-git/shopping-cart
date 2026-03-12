@@ -1,0 +1,41 @@
+<form action="/purchase_selected" method="post">
+
+<a href="/">⬅ Back to Store</a>
+<br><br>
+<table border="1" cellpadding="10">
+
+<tr>
+<th>Select</th>
+<th>Product</th>
+<th>Price</th>
+<th>Action</th>
+</tr>
+
+{% for item in cart %}
+
+<tr>
+
+<td>
+<input type="checkbox" name="selected_items" value="{{item._id}}">
+</td>
+
+<td>{{item.name}}</td>
+
+<td>₹{{item.price}}</td>
+
+<td>
+<a href="/remove/{{item._id}}">Remove</a>
+</td>
+
+</tr>
+
+{% endfor %}
+
+</table>
+
+<br>
+
+<button type="submit">Purchase </button>
+<br>
+<a href="/history">View Purchase History</a>
+</form>

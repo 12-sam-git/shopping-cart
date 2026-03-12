@@ -1,0 +1,6 @@
+Flask
+pymongo
+psycopg2-binary
+azure-storage-blob
+azure-storage-queue
+gunicorn
