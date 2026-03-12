@@ -25,21 +25,34 @@ queue_client = QueueClient.from_connection_string(
 )
 
 # MongoDB connection from App Service Configuration
-mongo_conn = os.environ.get("MONGO_CONNECTION_STRING")
-client = MongoClient(mongo_conn)
-db = client["shopping_db"]
-cart_collection = db["cart"]
+cart_collection = None
+
+try:
+    mongo_conn = os.environ.get("MONGO_CONNECTION_STRING")
+    client = MongoClient(mongo_conn, serverSelectionTimeoutMS=5000)
+    db = client["shopping_db"]
+    cart_collection = db["cart"]
+    print("MongoDB connected")
+except Exception as e:
+    print("MongoDB connection failed:", e)
 
 # PostgreSQL connection from App Service Configuration
-pg_conn = psycopg2.connect(
-    host=os.environ.get("POSTGRES_HOST"),
-    database=os.environ.get("POSTGRES_DB"),
-    user=os.environ.get("POSTGRES_USER"),
-    password=os.environ.get("POSTGRES_PASSWORD"),
-    port=os.environ.get("POSTGRES_PORT", "5432"),
-    sslmode="require"
-)
+pg_conn = None
+pg_cursor = None
 
+try:
+    pg_conn = psycopg2.connect(
+        host=os.environ.get("POSTGRES_HOST"),
+        database=os.environ.get("POSTGRES_DB"),
+        user=os.environ.get("POSTGRES_USER"),
+        password=os.environ.get("POSTGRES_PASSWORD"),
+        port=os.environ.get("POSTGRES_PORT", "5432"),
+        sslmode="require"
+    )
+    pg_cursor = pg_conn.cursor()
+    print("PostgreSQL connected")
+except Exception as e:
+    print("PostgreSQL connection failed:", e)
 pg_cursor = pg_conn.cursor()
 
 # Load products
@@ -165,3 +178,4 @@ def history():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000)
+
