@@ -28,7 +28,7 @@ queue_client = QueueClient.from_connection_string(
 cart_collection = None
 
 try:
-    mongo_conn = os.environ.get("MONGO_CONNECTION_STRING")
+    mongo_conn = os.environ.get("MONGO_URL")
     client = MongoClient(mongo_conn, serverSelectionTimeoutMS=5000)
     db = client["shopping_db"]
     cart_collection = db["cart"]
@@ -42,10 +42,10 @@ pg_cursor = None
 
 try:
     pg_conn = psycopg2.connect(
-        host=os.environ.get("POSTGRES_HOST"),
-        database=os.environ.get("POSTGRES_DB"),
-        user=os.environ.get("POSTGRES_USER"),
-        password=os.environ.get("POSTGRES_PASSWORD"),
+        host=os.environ.get("PG_HOST"),
+        database=os.environ.get("PG_DB"),
+        user=os.environ.get("PG_USER"),
+        password=os.environ.get("PG_PASSWORD"),
         port=os.environ.get("POSTGRES_PORT", "5432"),
         sslmode="require"
     )
@@ -178,5 +178,6 @@ def history():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000)
+
 
 
