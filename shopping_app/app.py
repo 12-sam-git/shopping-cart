@@ -73,7 +73,6 @@ except Exception as e:
 # ---------------- LOAD PRODUCTS ----------------
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
 PRODUCTS_FILE = os.path.join(BASE_DIR, "products.json")
 
 with open(PRODUCTS_FILE, "r", encoding="utf-8") as f:
@@ -95,7 +94,10 @@ def search():
     query = request.args.get("query", "").lower()
 
     if query:
-        queue_client.send_message(f"Search query: {query}")
+        try:
+            queue_client.send_message(f"Search query: {query}")
+        except Exception as e:
+            print("Queue error:", e)
 
     filtered = [p for p in products if query in p["name"].lower()]
 
@@ -113,11 +115,16 @@ def upload():
 
         filename = image.filename.lower()
 
-        blob_client = container_client.get_blob_client(filename)
+        try:
+            blob_client = container_client.get_blob_client(filename)
+            blob_client.upload_blob(image, overwrite=True)
+        except Exception as e:
+            print("Blob upload error:", e)
 
-        blob_client.upload_blob(image, overwrite=True)
-
-        queue_client.send_message(f"Image uploaded: {filename}")
+        try:
+            queue_client.send_message(f"Image uploaded: {filename}")
+        except Exception as e:
+            print("Queue error:", e)
 
         keyword = filename.split(".")[0]
 
@@ -154,7 +161,10 @@ def add_to_cart(pid):
 
             cart_collection.insert_one(item)
 
-            queue_client.send_message(f"Added to cart: {p['name']}")
+            try:
+                queue_client.send_message(f"Added to cart: {p['name']}")
+            except Exception as e:
+                print("Queue error:", e)
 
             break
 
@@ -185,7 +195,10 @@ def remove(id):
     item = cart_collection.find_one({"_id": ObjectId(id)})
 
     if item:
-        queue_client.send_message(f"Removed from cart: {item['name']}")
+        try:
+            queue_client.send_message(f"Removed from cart: {item['name']}")
+        except Exception as e:
+            print("Queue error:", e)
 
     cart_collection.delete_one({"_id": ObjectId(id)})
 
@@ -212,14 +225,21 @@ def purchase_selected():
 
             purchased_items.append(item)
 
-            queue_client.send_message(f"Purchase completed: {item['name']}")
+            try:
+                queue_client.send_message(f"Purchase completed: {item['name']}")
+            except Exception as e:
+                print("Queue error:", e)
 
-            pg_cursor.execute(
-                "INSERT INTO purchases(product_id, name, price VALUES (%s,%s,%s)",
-                (item["id"], item["name"], item["price"])
-            )
+            try:
+                pg_cursor.execute(
+                    "INSERT INTO purchases(product_id, name, price) VALUES (%s,%s,%s)",
+                    (item["id"], item["name"], item["price"])
+                )
 
-            pg_conn.commit()
+                pg_conn.commit()
+
+            except Exception as e:
+                print("PostgreSQL error:", e)
 
             cart_collection.delete_one({"_id": ObjectId(sid)})
 
@@ -231,9 +251,14 @@ def purchase_selected():
 @app.route("/history")
 def history():
 
-    pg_cursor.execute("SELECT name, price FROM purchases")
+    try:
+        pg_cursor.execute("SELECT name, price FROM purchases")
 
-    rows = pg_cursor.fetchall()
+        rows = pg_cursor.fetchall()
+
+    except Exception as e:
+        print("Postgres read error:", e)
+        rows = []
 
     items = []
 
