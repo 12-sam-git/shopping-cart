@@ -211,34 +211,41 @@ def remove(id):
 @app.route("/purchase_selected", methods=["POST"])
 def purchase_selected():
 
-    if cart_collection is None:
-        return "MongoDB connection failed"
+    try:
 
-    selected_ids = request.form.getlist("selected_items")
+        if cart_collection is None:
+            return "MongoDB connection failed"
 
-    purchased_items = []
+        selected_ids = request.form.getlist("selected_items")
 
-    for sid in selected_ids:
+        purchased_items = []
 
-        item = cart_collection.find_one({"_id": ObjectId(sid)})
+        for sid in selected_ids:
 
-        if item:
+            item = cart_collection.find_one({"_id": ObjectId(sid)})
 
-            purchased_items.append(item)
+            if item:
 
-            queue_client.send_message(f"Purchase completed: {item['name']}")
+                purchased_items.append(item)
 
-            pg_cursor.execute(
-                "INSERT INTO purchases(product_id, name, price) VALUES (%s,%s,%s)",
-                (item["id"], item["name"], item["price"])
-            )
+                try:
+                    queue_client.send_message(f"Purchase completed: {item['name']}")
+                except Exception as e:
+                    print("Queue error:", e)
 
-            pg_conn.commit()
+                pg_cursor.execute(
+                    "INSERT INTO purchases(product_id, name, price) VALUES (%s,%s,%s)",
+                    (item["id"], item["name"], item["price"])
+                )
 
-            cart_collection.delete_one({"_id": ObjectId(sid)})
+                pg_conn.commit()
 
-    return render_template("purchase.html", items=purchased_items)
+                cart_collection.delete_one({"_id": ObjectId(sid)})
 
+        return render_template("purchase.html", items=purchased_items)
+
+    except Exception as e:
+        return str(e)
 
 # ---------------- PURCHASE HISTORY ----------------
 
@@ -264,6 +271,7 @@ def history():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000)
+
 
 
 
