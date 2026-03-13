@@ -53,7 +53,6 @@ try:
     print("PostgreSQL connected")
 except Exception as e:
     print("PostgreSQL connection failed:", e)
-pg_cursor = pg_conn.cursor()
 
 # Load products
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -178,6 +177,7 @@ def history():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000)
+
 
 
 
