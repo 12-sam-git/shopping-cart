@@ -216,6 +216,9 @@ def purchase_selected():
         if cart_collection is None:
             return "MongoDB connection failed"
 
+        if pg_cursor is None:
+            return "PostgreSQL connection failed"
+
         selected_ids = request.form.getlist("selected_items")
 
         purchased_items = []
@@ -233,6 +236,7 @@ def purchase_selected():
                 except Exception as e:
                     print("Queue error:", e)
 
+                # INSERT INTO POSTGRES
                 pg_cursor.execute(
                     "INSERT INTO purchases(product_id, name, price) VALUES (%s,%s,%s)",
                     (item["id"], item["name"], item["price"])
@@ -240,13 +244,13 @@ def purchase_selected():
 
                 pg_conn.commit()
 
+                # DELETE FROM MONGO CART
                 cart_collection.delete_one({"_id": ObjectId(sid)})
 
         return render_template("purchase.html", items=purchased_items)
 
     except Exception as e:
         return str(e)
-
 # ---------------- PURCHASE HISTORY ----------------
 
 @app.route("/history")
@@ -271,6 +275,7 @@ def history():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000)
+
 
 
 
