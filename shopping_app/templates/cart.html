@@ -1,4 +1,4 @@
-<form action="/purchase_selected" method="post">
+<form action="/purchase_selected" method="POST">
 
 <a href="/">⬅ Back to Store</a>
 <br><br>
@@ -16,7 +16,7 @@
 <tr>
 
 <td>
-<input type="checkbox" name="selected_items" value="{{item._id}}">
+<input type="checkbox" name="selected_items" value="{{ item._id }}">
 </td>
 
 <td>{{item.name}}</td>
@@ -38,4 +38,5 @@
 <button type="submit">Purchase </button>
 <br>
 <a href="/history">View Purchase History</a>
+
 </form>
