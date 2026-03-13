@@ -67,6 +67,8 @@ try:
     print("PostgreSQL connected")
 
 except Exception as e:
+    pg_conn = None
+    pg_cursor = None
     print("PostgreSQL connection failed:", e)
 
 
@@ -275,6 +277,7 @@ def history():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000)
+
 
 
 
