@@ -9,23 +9,42 @@ import psycopg2
 
 app = Flask(__name__)
 
-UPLOAD_FOLDER = "uploads"
-app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
-
-
 # ---------------- AZURE STORAGE ----------------
 
 connection_string = os.environ.get("STORAGE_CONNECTION_STRING")
 
-blob_service_client = BlobServiceClient.from_connection_string(connection_string)
+blob_service_client = None
+container_client = None
+queue_client = None
 
-container_name = "productimages"
-container_client = blob_service_client.get_container_client(container_name)
+if connection_string:
+    try:
+        blob_service_client = BlobServiceClient.from_connection_string(connection_string)
 
-queue_client = QueueClient.from_connection_string(
-    connection_string,
-    "storage-queue"
-)
+        container_name = "productimages"
+        container_client = blob_service_client.get_container_client(container_name)
+
+        queue_client = QueueClient.from_connection_string(
+            connection_string,
+            "storage-queue"
+        )
+
+        print("Azure Storage connected")
+
+    except Exception as e:
+        print("Azure Storage error:", e)
+else:
+    print("Storage connection string missing")
+
+
+# ---------------- SAFE QUEUE FUNCTION ----------------
+
+def safe_queue(message):
+    try:
+        if queue_client:
+            queue_client.send_message(message)
+    except Exception as e:
+        print("Queue error:", e)
 
 
 # ---------------- MONGODB ----------------
@@ -94,10 +113,7 @@ def search():
     query = request.args.get("query", "").lower()
 
     if query:
-        try:
-            queue_client.send_message(f"Search query: {query}")
-        except Exception as e:
-            print("Queue error:", e)
+        safe_queue(f"Search query: {query}")
 
     filtered = [p for p in products if query in p["name"].lower()]
 
@@ -116,15 +132,13 @@ def upload():
         filename = image.filename.lower()
 
         try:
-            blob_client = container_client.get_blob_client(filename)
-            blob_client.upload_blob(image, overwrite=True)
+            if container_client:
+                blob_client = container_client.get_blob_client(filename)
+                blob_client.upload_blob(image, overwrite=True)
         except Exception as e:
             print("Blob upload error:", e)
 
-        try:
-            queue_client.send_message(f"Image uploaded: {filename}")
-        except Exception as e:
-            print("Queue error:", e)
+        safe_queue(f"Image uploaded: {filename}")
 
         keyword = filename.split(".")[0]
 
@@ -161,10 +175,7 @@ def add_to_cart(pid):
 
             cart_collection.insert_one(item)
 
-            try:
-                queue_client.send_message(f"Added to cart: {p['name']}")
-            except Exception as e:
-                print("Queue error:", e)
+            safe_queue(f"Added to cart: {p['name']}")
 
             break
 
@@ -195,10 +206,7 @@ def remove(id):
     item = cart_collection.find_one({"_id": ObjectId(id)})
 
     if item:
-        try:
-            queue_client.send_message(f"Removed from cart: {item['name']}")
-        except Exception as e:
-            print("Queue error:", e)
+        safe_queue(f"Removed from cart: {item['name']}")
 
     cart_collection.delete_one({"_id": ObjectId(id)})
 
@@ -215,6 +223,9 @@ def purchase_selected():
 
     selected_ids = request.form.getlist("selected_items")
 
+    if not selected_ids:
+        return redirect("/cart")
+
     purchased_items = []
 
     for sid in selected_ids:
@@ -225,21 +236,19 @@ def purchase_selected():
 
             purchased_items.append(item)
 
-            try:
-                queue_client.send_message(f"Purchase completed: {item['name']}")
-            except Exception as e:
-                print("Queue error:", e)
+            safe_queue(f"Purchase completed: {item['name']}")
 
-            try:
-                pg_cursor.execute(
-                    "INSERT INTO purchases(product_id, name, price) VALUES (%s,%s,%s)",
-                    (item["id"], item["name"], item["price"])
-                )
+            if pg_cursor:
+                try:
+                    pg_cursor.execute(
+                        "INSERT INTO purchases(product_id, name, price) VALUES (%s,%s,%s)",
+                        (item["id"], item["name"], item["price"])
+                    )
 
-                pg_conn.commit()
+                    pg_conn.commit()
 
-            except Exception as e:
-                print("PostgreSQL error:", e)
+                except Exception as e:
+                    print("PostgreSQL error:", e)
 
             cart_collection.delete_one({"_id": ObjectId(sid)})
 
@@ -251,14 +260,14 @@ def purchase_selected():
 @app.route("/history")
 def history():
 
-    try:
-        pg_cursor.execute("SELECT name, price FROM purchases")
+    rows = []
 
-        rows = pg_cursor.fetchall()
-
-    except Exception as e:
-        print("Postgres read error:", e)
-        rows = []
+    if pg_cursor:
+        try:
+            pg_cursor.execute("SELECT name, price FROM purchases")
+            rows = pg_cursor.fetchall()
+        except Exception as e:
+            print("Postgres read error:", e)
 
     items = []
 
