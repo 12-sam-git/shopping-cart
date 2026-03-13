@@ -158,14 +158,19 @@ def add_to_cart(pid):
             if "_id" in item:
                 del item["_id"]
 
-            cart_collection.insert_one(item)
+            try:
+                cart_collection.insert_one(item)
+            except Exception as e:
+                return str(e)
 
-            queue_client.send_message(f"Added to cart: {p['name']}")
+            try:
+                queue_client.send_message(f"Added to cart: {p['name']}")
+            except Exception as e:
+                print("Queue error:", e)
 
             break
 
     return redirect("/cart")
-
 
 # ---------------- CART PAGE ----------------
 
@@ -191,7 +196,10 @@ def remove(id):
     item = cart_collection.find_one({"_id": ObjectId(id)})
 
     if item:
-        queue_client.send_message(f"Removed from cart: {item['name']}")
+        try:
+            queue_client.send_message(f"Removed from cart: {item['name']}")
+        except Exception as e:
+            print("Queue error:", e)
 
     cart_collection.delete_one({"_id": ObjectId(id)})
 
@@ -221,7 +229,7 @@ def purchase_selected():
             queue_client.send_message(f"Purchase completed: {item['name']}")
 
             pg_cursor.execute(
-                "INSERT INTO purchases(product_id, name, price VALUES (%s,%s,%s)",
+                "INSERT INTO purchases(product_id, name, price) VALUES (%s,%s,%s)",
                 (item["id"], item["name"], item["price"])
             )
 
@@ -256,6 +264,7 @@ def history():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000)
+
 
 
 
