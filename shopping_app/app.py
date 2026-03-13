@@ -135,6 +135,12 @@ def upload():
     return redirect("/")
 
 
+@app.route("/debug")
+def debug():
+    import os
+    return str(os.getenv("STORAGE_CONNECTION_STRING"))
+
+
 # ---------------- ADD TO CART ----------------
 
 @app.route("/add_to_cart/<int:pid>")
@@ -250,4 +256,5 @@ def history():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000)
+
 
