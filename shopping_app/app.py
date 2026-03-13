@@ -28,11 +28,16 @@ queue_client = QueueClient.from_connection_string(
 cart_collection = None
 
 try:
-    mongo_conn = os.environ.get("MONGO_URL")
+   mongo_conn = os.environ.get("MONGO_URL")
+
     client = MongoClient(mongo_conn, serverSelectionTimeoutMS=5000)
+
     db = client["shopping_db"]
+
     cart_collection = db["cart"]
+
     print("MongoDB connected")
+
 except Exception as e:
     print("MongoDB connection failed:", e)
 
@@ -177,6 +182,7 @@ def history():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000)
+
 
 
 
