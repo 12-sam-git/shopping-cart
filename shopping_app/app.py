@@ -7,10 +7,11 @@ import json
 import os
 import psycopg2
 
-app = Flask(**name**)
+app = Flask(__name__)
 
 UPLOAD_FOLDER = "uploads"
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+
 
 # ---------------- AZURE STORAGE ----------------
 
@@ -22,29 +23,29 @@ container_name = "productimages"
 container_client = blob_service_client.get_container_client(container_name)
 
 queue_client = QueueClient.from_connection_string(
-connection_string,
-"storage-queue"
+    connection_string,
+    "storage-queue"
 )
+
 
 # ---------------- MONGODB ----------------
 
 cart_collection = None
 
 try:
-mongo_conn = os.environ.get("MONGO_URL")
+    mongo_conn = os.environ.get("MONGO_URL")
 
-```
-client = MongoClient(mongo_conn, serverSelectionTimeoutMS=5000)
+    client = MongoClient(mongo_conn, serverSelectionTimeoutMS=5000)
 
-db = client["shopping_db"]
+    db = client["shopping_db"]
 
-cart_collection = db["cart"]
+    cart_collection = db["cart"]
 
-print("MongoDB connected")
-```
+    print("MongoDB connected")
 
 except Exception as e:
-print("MongoDB connection failed:", e)
+    print("MongoDB connection failed:", e)
+
 
 # ---------------- POSTGRESQL ----------------
 
@@ -52,27 +53,27 @@ pg_conn = None
 pg_cursor = None
 
 try:
-pg_conn = psycopg2.connect(
-host=os.environ.get("PG_HOST"),
-database=os.environ.get("PG_DB"),
-user=os.environ.get("PG_USER"),
-password=os.environ.get("PG_PASSWORD"),
-port=os.environ.get("POSTGRES_PORT", "5432"),
-sslmode="require"
-)
+    pg_conn = psycopg2.connect(
+        host=os.environ.get("PG_HOST"),
+        database=os.environ.get("PG_DB"),
+        user=os.environ.get("PG_USER"),
+        password=os.environ.get("PG_PASSWORD"),
+        port=os.environ.get("POSTGRES_PORT", "5432"),
+        sslmode="require"
+    )
 
-```
-pg_cursor = pg_conn.cursor()
+    pg_cursor = pg_conn.cursor()
 
-print("PostgreSQL connected")
-```
+    print("PostgreSQL connected")
 
 except Exception as e:
-print("PostgreSQL connection failed:", e)
+    print("PostgreSQL connection failed:", e)
+
 
 # ---------------- LOAD PRODUCTS ----------------
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 PRODUCTS_FILE = os.path.join(BASE_DIR, "products.json")
 
 with open(PRODUCTS_FILE, "r", encoding="utf-8") as f:
@@ -94,10 +95,7 @@ def search():
     query = request.args.get("query", "").lower()
 
     if query:
-        try:
-            queue_client.send_message(f"Search query: {query}")
-        except Exception as e:
-            print("Queue error:", e)
+        queue_client.send_message(f"Search query: {query}")
 
     filtered = [p for p in products if query in p["name"].lower()]
 
@@ -115,16 +113,11 @@ def upload():
 
         filename = image.filename.lower()
 
-        try:
-            blob_client = container_client.get_blob_client(filename)
-            blob_client.upload_blob(image, overwrite=True)
-        except Exception as e:
-            print("Blob upload error:", e)
+        blob_client = container_client.get_blob_client(filename)
 
-        try:
-            queue_client.send_message(f"Image uploaded: {filename}")
-        except Exception as e:
-            print("Queue error:", e)
+        blob_client.upload_blob(image, overwrite=True)
+
+        queue_client.send_message(f"Image uploaded: {filename}")
 
         keyword = filename.split(".")[0]
 
@@ -161,10 +154,7 @@ def add_to_cart(pid):
 
             cart_collection.insert_one(item)
 
-            try:
-                queue_client.send_message(f"Added to cart: {p['name']}")
-            except Exception as e:
-                print("Queue error:", e)
+            queue_client.send_message(f"Added to cart: {p['name']}")
 
             break
 
@@ -195,10 +185,7 @@ def remove(id):
     item = cart_collection.find_one({"_id": ObjectId(id)})
 
     if item:
-        try:
-            queue_client.send_message(f"Removed from cart: {item['name']}")
-        except Exception as e:
-            print("Queue error:", e)
+        queue_client.send_message(f"Removed from cart: {item['name']}")
 
     cart_collection.delete_one({"_id": ObjectId(id)})
 
@@ -225,21 +212,14 @@ def purchase_selected():
 
             purchased_items.append(item)
 
-            try:
-                queue_client.send_message(f"Purchase completed: {item['name']}")
-            except Exception as e:
-                print("Queue error:", e)
+            queue_client.send_message(f"Purchase completed: {item['name']}")
 
-            try:
-                pg_cursor.execute(
-                    "INSERT INTO purchases(product_id, name, price) VALUES (%s,%s,%s)",
-                    (item["id"], item["name"], item["price"])
-                )
+            pg_cursor.execute(
+                "INSERT INTO purchases(product_id, name, price VALUES (%s,%s,%s)",
+                (item["id"], item["name"], item["price"])
+            )
 
-                pg_conn.commit()
-
-            except Exception as e:
-                print("PostgreSQL error:", e)
+            pg_conn.commit()
 
             cart_collection.delete_one({"_id": ObjectId(sid)})
 
@@ -251,14 +231,9 @@ def purchase_selected():
 @app.route("/history")
 def history():
 
-    try:
-        pg_cursor.execute("SELECT name, price FROM purchases")
+    pg_cursor.execute("SELECT name, price FROM purchases")
 
-        rows = pg_cursor.fetchall()
-
-    except Exception as e:
-        print("Postgres read error:", e)
-        rows = []
+    rows = pg_cursor.fetchall()
 
     items = []
 
@@ -275,4 +250,3 @@ def history():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000)
-
