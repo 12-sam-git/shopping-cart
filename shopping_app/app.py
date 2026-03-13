@@ -35,7 +35,7 @@ cart_collection = None
 try:
     mongo_conn = os.environ.get("MONGO_URL")
 
-    client = MongoClient("mongodb://74.249.158.237:27017/")
+    client = MongoClient("mongodb://10.0.1.4:27017/")
 
     db = client["shopping_db"]
 
@@ -256,5 +256,6 @@ def history():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000)
+
 
 
