@@ -33,14 +33,9 @@ queue_client = QueueClient.from_connection_string(
 cart_collection = None
 
 try:
-    mongo_conn = os.environ.get("MONGO_URL")
-
     client = MongoClient("mongodb://10.0.1.4:27017/")
-
     db = client["shopping_db"]
-
     cart_collection = db["cart"]
-
     print("MongoDB connected")
 
 except Exception as e:
@@ -63,19 +58,15 @@ try:
     )
 
     pg_cursor = pg_conn.cursor()
-
     print("PostgreSQL connected")
 
 except Exception as e:
-    pg_conn = None
-    pg_cursor = None
     print("PostgreSQL connection failed:", e)
 
 
 # ---------------- LOAD PRODUCTS ----------------
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
 PRODUCTS_FILE = os.path.join(BASE_DIR, "products.json")
 
 with open(PRODUCTS_FILE, "r", encoding="utf-8") as f:
@@ -97,7 +88,10 @@ def search():
     query = request.args.get("query", "").lower()
 
     if query:
-        queue_client.send_message(f"Search query: {query}")
+        try:
+            queue_client.send_message(f"Search query: {query}")
+        except:
+            pass
 
     filtered = [p for p in products if query in p["name"].lower()]
 
@@ -116,18 +110,16 @@ def upload():
         filename = image.filename.lower()
 
         blob_client = container_client.get_blob_client(filename)
-
         blob_client.upload_blob(image, overwrite=True)
 
-        queue_client.send_message(f"Image uploaded: {filename}")
+        try:
+            queue_client.send_message(f"Image uploaded: {filename}")
+        except:
+            pass
 
         keyword = filename.split(".")[0]
 
-        results = []
-
-        for p in products:
-            if keyword in p["name"].lower():
-                results.append(p)
+        results = [p for p in products if keyword in p["name"].lower()]
 
         if not results:
             results = products
@@ -135,12 +127,6 @@ def upload():
         return render_template("index.html", products=results)
 
     return redirect("/")
-
-
-@app.route("/debug")
-def debug():
-    import os
-    return str(os.getenv("STORAGE_CONNECTION_STRING"))
 
 
 # ---------------- ADD TO CART ----------------
@@ -160,19 +146,17 @@ def add_to_cart(pid):
             if "_id" in item:
                 del item["_id"]
 
-            try:
-                cart_collection.insert_one(item)
-            except Exception as e:
-                return str(e)
+            cart_collection.insert_one(item)
 
             try:
                 queue_client.send_message(f"Added to cart: {p['name']}")
-            except Exception as e:
-                print("Queue error:", e)
+            except:
+                pass
 
             break
 
     return redirect("/cart")
+
 
 # ---------------- CART PAGE ----------------
 
@@ -200,8 +184,8 @@ def remove(id):
     if item:
         try:
             queue_client.send_message(f"Removed from cart: {item['name']}")
-        except Exception as e:
-            print("Queue error:", e)
+        except:
+            pass
 
     cart_collection.delete_one({"_id": ObjectId(id)})
 
@@ -213,56 +197,54 @@ def remove(id):
 @app.route("/purchase_selected", methods=["POST"])
 def purchase_selected():
 
-    try:
+    if cart_collection is None:
+        return "MongoDB connection failed"
 
-        if cart_collection is None:
-            return "MongoDB connection failed"
+    if pg_cursor is None:
+        return "PostgreSQL connection failed"
 
-        if pg_cursor is None:
-            return "PostgreSQL connection failed"
+    selected_ids = request.form.getlist("selected_items")
 
-        selected_ids = request.form.getlist("selected_items")
+    purchased_items = []
 
-        purchased_items = []
+    for sid in selected_ids:
 
-        for sid in selected_ids:
+        item = cart_collection.find_one({"_id": ObjectId(sid)})
 
-            item = cart_collection.find_one({"_id": ObjectId(sid)})
+        if item:
 
-            if item:
+            purchased_items.append(item)
 
-                purchased_items.append(item)
+            try:
+                queue_client.send_message(f"Purchase completed: {item['name']}")
+            except:
+                pass
 
-                try:
-                    queue_client.send_message(f"Purchase completed: {item['name']}")
-                except Exception as e:
-                    print("Queue error:", e)
+            try:
+                pg_cursor.execute(
+                    "INSERT INTO purchases(product_id, name, price) VALUES (%s,%s,%s)",
+                    (int(item["id"]), item["name"], int(item["price"]))
+                )
 
-                # INSERT INTO POSTGRES
-                try:
-                    pg_cursor.execute(
-                        "INSERT INTO purchases(product_id, name, price) VALUES (%s,%s,%s)",
-                        (int(item["id"]), item["name"], int(item["price"]))
-                     )
-                    
-                    pg_conn.commit()
-                    
-            print("Inserted:", item["name"])
+                pg_conn.commit()
 
-except Exception as e:
-    print("PostgreSQL error:", e)
+                print("Inserted:", item["name"])
 
-                # DELETE FROM MONGO CART
-                cart_collection.delete_one({"_id": ObjectId(sid)})
+            except Exception as e:
+                print("PostgreSQL insert error:", e)
 
-        return render_template("purchase.html", items=purchased_items)
+            cart_collection.delete_one({"_id": ObjectId(sid)})
 
-    except Exception as e:
-        return str(e)
+    return render_template("purchase.html", items=purchased_items)
+
+
 # ---------------- PURCHASE HISTORY ----------------
 
 @app.route("/history")
 def history():
+
+    if pg_cursor is None:
+        return "PostgreSQL connection failed"
 
     pg_cursor.execute("SELECT name, price FROM purchases")
 
@@ -283,11 +265,3 @@ def history():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000)
-
-
-
-
-
-
-
-
