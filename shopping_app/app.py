@@ -239,12 +239,18 @@ def purchase_selected():
                     print("Queue error:", e)
 
                 # INSERT INTO POSTGRES
-                pg_cursor.execute(
-                    "INSERT INTO purchases(product_id, name, price) VALUES (%s,%s,%s)",
-                    (item["id"], item["name"], item["price"])
-                )
+                try:
+                    pg_cursor.execute(
+                        "INSERT INTO purchases(product_id, name, price) VALUES (%s,%s,%s)",
+                        (int(item["id"]), item["name"], int(item["price"]))
+                     )
+                    
+                    pg_conn.commit()
+                    
+            print("Inserted:", item["name"])
 
-                pg_conn.commit()
+except Exception as e:
+    print("PostgreSQL error:", e)
 
                 # DELETE FROM MONGO CART
                 cart_collection.delete_one({"_id": ObjectId(sid)})
@@ -277,6 +283,7 @@ def history():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000)
+
 
 
 
